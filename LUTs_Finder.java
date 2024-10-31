@@ -1,6 +1,6 @@
 /*
 Kevin Terretaz
-241028 LUT Finder 0.9
+241031 LUT Finder 0.91
 */
 import ij.*;
 import ij.CompositeImage;
@@ -20,8 +20,7 @@ import java.util.Arrays;
 import java.awt.image.IndexColorModel;
 
 public class LUTs_Finder implements PlugIn {
-
-    private static final String[] COLUMN_NAMES = new String[]{"LUT Name", "Preview", "Colors", "Estimated Description"};
+    private static final String[] COLUMN_NAMES = new String[]{"LUT Name", "Preview","Estimated Description" , "Colors"};
 
     @Override
     public void run(String arg) {
@@ -33,12 +32,22 @@ public class LUTs_Finder implements PlugIn {
         Object[][] table_Data = new Object[lut_List.length][4];
         for (int i = 0; i < lut_List.length; i++) {
             String lut_Name = lut_List[i];
-            table_Data[i] = new Object[]{lut_Name, getLutIcon(lut_Name), getLutColors(lut_Name), getLutInfos(lut_Name)};
+            table_Data[i] = new Object[]{lut_Name, get_Lut_Icon(lut_Name), get_Lut_Infos(lut_Name), get_Lut_Colors(lut_Name)};
         }
-
         DefaultTableModel table_Model = get_Table_Model(table_Data);
-        JTable table = new JTable(table_Model);
-
+        JTable table = new JTable(table_Model) {
+            @Override
+            public String getToolTipText(MouseEvent event) {
+                java.awt.Point point = event.getPoint();
+                int row = rowAtPoint(point);
+                int column = columnAtPoint(point);
+                if (column == 1) {
+                    column = 0;
+                }
+                Object value = getValueAt(row, column);
+                return (value != null) ? value.toString() : null;
+            }
+        };
         // Key Listener
         table.addKeyListener(new KeyAdapter() {
             @Override
@@ -54,7 +63,6 @@ public class LUTs_Finder implements PlugIn {
                 }
             }
         });
-
         // Mouse Listener for Double Click
         table.addMouseListener(new MouseAdapter() {
             @Override
@@ -67,34 +75,32 @@ public class LUTs_Finder implements PlugIn {
         table.setDragEnabled(true);
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         table.setTransferHandler(get_Transfer_Handler());
-        table.setRowHeight(34);
-        table.getColumnModel().getColumn(0).setPreferredWidth(120);
-        table.getColumnModel().getColumn(1).setPreferredWidth(200);
-        table.getColumnModel().getColumn(2).setPreferredWidth(150);
-        table.getColumnModel().getColumn(3).setPreferredWidth(250);
-
+        table.setRowHeight(26);
+        table.getColumnModel().getColumn(0).setPreferredWidth(170);
+        table.getColumnModel().getColumn(1).setPreferredWidth(258);
+        table.getColumnModel().getColumn(2).setPreferredWidth(290);
+        table.getColumnModel().getColumn(3).setPreferredWidth(143);
         // Search Panel
         String help_Text = "<html><body style='background-color: #454545; color: #ffffff;'>" +
-                "<strong>Applying a LUT:</strong><br>" +
-                "_   Double-Click on a LUT name or press <strong>Enter</strong> to apply the selected LUT to your image.<br><br>" +
-                "<strong>About LUTs preview bands:</strong><br>" +
-                "_ The LUT images display bands of small value shift.<br>" +
-                "_ Check for uniformity in color transitions for better contrast visibility.<br><br>" +
-                "<strong>Description strings:</strong><br>" +
-                "_ Each LUT comes with an estimated description of its properties:<ul>" +
-                    "<li><strong>Linear, Non-linear:</strong> Whether the brightness progression is linear.</li>" +
-                    "<li><strong>Diverging:</strong> Transitions from one color through a neutral midpoint to another color.</li>" +
-                    "<li><strong>Isoluminant:</strong> Changes in color but keeps the luminance consistent across the LUT.</li>" +
-                    "<li><strong>Cyclic:</strong> If the first and last colors are the same.</li>" +
-                    "<li><strong>Colorfulness:</strong> Multicolor or Monochrome.</li>" +
-                    "<li><strong>Classic:</strong> Identifies basic 'pure' LUTs (Red, Green, Blue, Cyan, etc.).</li>" +
-                "</ul></li>" +
-        "</body></html>";
+        "<strong>Applying a LUT:</strong><br>" +
+        "_   Double-Click on a LUT name or press <strong>Enter</strong> to apply the selected LUT to your image.<br><br>" +
+        "<strong>About LUTs preview bands:</strong><br>" +
+        "_ The LUT images display bands of small value shift.<br>" +
+        "_ Check for uniformity in color transitions for better contrast visibility.<br><br>" +
+        "<strong>Description strings:</strong><br>" +
+        "_ Each LUT comes with an estimated description of its properties:<ul>" +
+            "<li><strong>Linear, Non-linear:</strong> Whether the brightness progression is linear.</li>" +
+            "<li><strong>Diverging:</strong> Transitions from one color through a neutral midpoint to another color.</li>" +
+            "<li><strong>Isoluminant:</strong> Changes in color but keeps the luminance consistent across the LUT.</li>" +
+            "<li><strong>Cyclic:</strong> If the first and last colors are the same.</li>" +
+            "<li><strong>Colorfulness:</strong> Multicolor or Monochrome.</li>" +
+            "<li><strong>Basic:</strong> Identifies classic 'pure' LUTs (Red, Green, Blue, Cyan, etc.).</li>";
         JPanel search_Panel = new JPanel();
+        // Filter bar
         JTextField search_Bar = new JTextField(30);
-        search_Bar.setToolTipText("<html>Filter list by one or more properties (name, color, description)<br> add a '!' prefix to remove properties from the list. (i.e. '!blue')");
+        search_Bar.setToolTipText("<html>Filter list by one or more properties (name, color, description)<br>add a '!' prefix to remove properties from the list. (i.e. ' !blue ')");
         TableRowSorter<TableModel> table_Sorter = new TableRowSorter<>(table_Model);
-        table_Sorter.toggleSortOrder(3);
+        table_Sorter.toggleSortOrder(2);
         table.setRowSorter(table_Sorter);
         search_Bar.getDocument().addDocumentListener(get_Filter_Listener(search_Bar, table_Sorter));
         search_Bar.addKeyListener(new KeyAdapter() {
@@ -105,9 +111,7 @@ public class LUTs_Finder implements PlugIn {
                     if (table.getSelectedRow() == -1) table.setRowSelectionInterval(0, 0);
                     next_Row = table.getSelectedRow();
                     // if Enter
-                    if (e.getKeyCode() == KeyEvent.VK_ENTER) {
-                        apply_LUT(table);
-                    }
+                    if (e.getKeyCode() == KeyEvent.VK_ENTER) apply_LUT(table);
                     // if up
                     if (e.getKeyCode() == KeyEvent.VK_UP) {
                         next_Row = table.getSelectedRow() - 1;
@@ -121,21 +125,20 @@ public class LUTs_Finder implements PlugIn {
                 }
             }
         });
-
         search_Panel.add(new JLabel("Filter :"));
         search_Panel.add(search_Bar);
-        // clear
+        // clear button
         JButton reset_Button = new JButton("Clear");
         reset_Button.addActionListener(e -> search_Bar.setText(""));
         reset_Button.setToolTipText("Remove filter text");
         search_Panel.add(reset_Button);
-        // about
+        // about button
         JButton help_Button = new JButton("About");
         help_Button.addActionListener(e -> new HTMLDialog("About", help_Text, false));
         search_Panel.add(help_Button);
-        // grey
+        // grey button
         JButton grey_Button = new JButton("Gray check");
-        grey_Button.setToolTipText("compare current LUT to gray");
+        grey_Button.setToolTipText("Compare current LUT to gray");
         grey_Button.addMouseListener(new MouseAdapter() {
             LUT lut;
             public void mousePressed(MouseEvent e) {
@@ -157,14 +160,13 @@ public class LUTs_Finder implements PlugIn {
             }
         });
         search_Panel.add(grey_Button);
-
         // Create and display the JFrame
-        JFrame frame = new JFrame("LUTs Finder cul");
+        JFrame frame = new JFrame("LUTs Finder");
         frame.setLayout(new BorderLayout());
         frame.add(search_Panel, BorderLayout.NORTH);
         frame.add(new JScrollPane(table), BorderLayout.CENTER);
         frame.setLocation(300, 300);
-        frame.setSize(1000, 820);
+        frame.setSize(900, 600);
         frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         frame.setVisible(true);
     }
@@ -188,21 +190,21 @@ public class LUTs_Finder implements PlugIn {
         }
     }
 
-    private static ImageIcon getLutIcon(String lut_Name) {
-        ImagePlus lut_Image = IJ.createImage("LUT icon", "8-bit ramp", 256, 32, 1);
+    private static ImageIcon get_Lut_Icon(String lut_Name) {
+        ImagePlus lut_Image = IJ.createImage("LUT icon", "8-bit ramp", 256, 24, 1);
         ImageProcessor ip = lut_Image.getProcessor();
         ip.setColorModel(LutLoader.getLut(lut_Name));
         for (int x = 0; x < 256; x++) {
             int gray_Value = x;
             int shifted_Value = (gray_Value + 10);
-            for (int y = 16; y < 28; y++) {
+            for (int y = 15; y < 23; y++) {
                 ip.putPixel(x, y, (x % 3 == 0 || x % 3 == 3) ? gray_Value : shifted_Value); // Stripes
             }
         }
         return new ImageIcon(ip.getBufferedImage());
     }
 
-    private static String getLutColors(String lut_Name) {
+    private static String get_Lut_Colors(String lut_Name) {
         java.util.List<String> colors = new java.util.ArrayList<>();
         IndexColorModel lut = LutLoader.getLut(lut_Name);
         byte[] reds = new byte[256];
@@ -216,7 +218,7 @@ public class LUTs_Finder implements PlugIn {
             int red = reds[i] & 255;
             int green = greens[i] & 255;
             int blue = blues[i] & 255;
-            String color_Name = getColorName(red, green, blue);
+            String color_Name = get_Color_Name(red, green, blue);
             if (color_Name != null && !colors.contains(color_Name)) {
                 colors.add(color_Name);
             }
@@ -224,17 +226,15 @@ public class LUTs_Finder implements PlugIn {
         return String.join(", ", colors);
     }
 
-    private static String getColorName(int r, int g, int b) {
+    private static String get_Color_Name(int r, int g, int b) {
         float[] hsv = Color.RGBtoHSB(r, g, b, null);
         float hue = hsv[0] * 360;  // Hue is between 0 and 1, so multiply by 360
         float saturation = hsv[1];  // Saturation between 0 and 1
         float value = hsv[2];  // Brightness (value) between 0 and 1
-
         // Detect black, gray, and white
         if (value < 0.05f) return "black";
         if (saturation < 0.15 && value >= 0.05 && value <= 0.9) return "gray";
         if (value > 0.9 && saturation < 0.12) return "white";
-
         // Classify color based on hue
         if ((hue >= 0 && hue <= 15) || (hue >= 340 && hue <= 360)) return "red";
         if (hue > 15 && hue <= 45) return "orange";
@@ -247,7 +247,7 @@ public class LUTs_Finder implements PlugIn {
         return null;
     }
 
-    private static String getLutInfos(String lut_Name) {
+    private static String get_Lut_Infos(String lut_Name) {
         IndexColorModel lut = LutLoader.getLut(lut_Name);
         byte[] reds = new byte[256];
         byte[] greens = new byte[256];
@@ -255,8 +255,7 @@ public class LUTs_Finder implements PlugIn {
         lut.getReds(reds);
         lut.getGreens(greens);
         lut.getBlues(blues);
-        int[] lut_Luminance = getLutinance(reds, greens, blues);
-
+        int[] lut_Luminance = get_Lutinance(reds, greens, blues);
         // Linearity
         String is_Linear = "Linear";
         int step = 20;
@@ -274,12 +273,11 @@ public class LUTs_Finder implements PlugIn {
         int previous_Trend = luminance_Trend.get(0);
         for (int i = 1; i < luminance_Trend.size(); i++) {
             if (!luminance_Trend.get(i).equals(previous_Trend)) {
-                is_Linear = "Non-linear";
+                is_Linear = "Non-uniform";
                 n_Luminance_Shift++;
                 previous_Trend = luminance_Trend.get(i);
             }
         }
-
         // Circularity
         String is_Cyclic = "Cyclic";
         int tolerance = 15;
@@ -288,7 +286,6 @@ public class LUTs_Finder implements PlugIn {
             is_Near(blues[0], blues[255], tolerance))) {
             is_Cyclic = null;
         }
-
         // Isoluminance
         String is_Isoluminant = "Isoluminant";
         for (int i = 0; i < 256; i++) {
@@ -299,7 +296,6 @@ public class LUTs_Finder implements PlugIn {
         }
         if (is_Isoluminant != null) is_Linear = "Linear";
         if (lut_Name.equalsIgnoreCase("Blue")) is_Isoluminant = null; // pure blue is freaking dark..
-
         // Diverging
         String is_Diverging = "Diverging";
         if (lut_Luminance[255] < 60) is_Diverging = null;
@@ -311,26 +307,23 @@ public class LUTs_Finder implements PlugIn {
                 }
             }
         }
-
         // Colorfulness
         String is_Multicolor = "Multicolor";
-        String colors_String = getLutColors(lut_Name);
+        String colors_String = get_Lut_Colors(lut_Name);
         String[] colors_Array = colors_String.split(", ");
-        int multicolor_Count = 0;
+        int color_Count = 0;
         for (String color : colors_Array) {
             if (!color.equalsIgnoreCase("black") && !color.equalsIgnoreCase("white") && !color.equalsIgnoreCase("gray")) {
-                multicolor_Count++;
+                color_Count++;
             }
         }
-        if (multicolor_Count <= 1) is_Multicolor = "Monochrome";
-
+        if (color_Count <= 1) is_Multicolor = "Monochrome";
         // Basic LUT
         String[] classic_LUTs = new String[]{"Red", "Green", "Blue", "Cyan", "Magenta", "Yellow", "Grays", "HiLo"};
         String is_Classic = null;
         for(int i = 0; i < classic_LUTs.length; i++) {
             if (classic_LUTs[i].equals(lut_Name)) is_Classic = "Basic";
         }
-
         // Build Description String
         StringBuilder infos = new StringBuilder();
         if (is_Classic != null)
@@ -346,11 +339,10 @@ public class LUTs_Finder implements PlugIn {
             infos.append(", ").append((lut_Luminance[255] > lut_Luminance[0]) ? "ascending" : "inverted");
         infos.append(", ").append("min:").append(IJ.pad(lut_Luminance[0],3)).append(", max:").append(IJ.pad(lut_Luminance[255],3)); // Add luminance bounds
         infos.append(", ").append(is_Multicolor);
-
         return infos.toString();
     }
 
-    private static int[] getLutinance(byte[] reds, byte[] greens, byte[] blues) {
+    private static int[] get_Lutinance(byte[] reds, byte[] greens, byte[] blues) {
         // Returns an array of luminance values of the LUT
         int[] lutinance = new int[256];
         for (int i = 0; i < 256; i++) {
