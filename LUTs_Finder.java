@@ -1,6 +1,6 @@
 /*
 Kevin Terretaz
-241031 LUT Finder 0.91
+250102 LUT Finder 0.92
 */
 import ij.*;
 import ij.CompositeImage;
@@ -86,10 +86,10 @@ public class LUTs_Finder implements PlugIn {
         "_   Double-Click on a LUT name or press <strong>Enter</strong> to apply the selected LUT to your image.<br><br>" +
         "<strong>About LUTs preview bands:</strong><br>" +
         "_ The LUT images display bands of small value shift.<br>" +
-        "_ Check for uniformity in color transitions for better contrast visibility.<br><br>" +
-        "<strong>Description strings:</strong><br>" +
+        "_ Check for uniformity in color transitions for good contrast visibility.<br><br>" +
+        "<strong>Description:</strong><br>" +
         "_ Each LUT comes with an estimated description of its properties:<ul>" +
-            "<li><strong>Linear, Non-linear:</strong> Whether the brightness progression is linear.</li>" +
+            "<li><strong>Linear, Non-uniform:</strong> Whether the brightness progression is linear.</li>" +
             "<li><strong>Diverging:</strong> Transitions from one color through a neutral midpoint to another color.</li>" +
             "<li><strong>Isoluminant:</strong> Changes in color but keeps the luminance consistent across the LUT.</li>" +
             "<li><strong>Cyclic:</strong> If the first and last colors are the same.</li>" +
